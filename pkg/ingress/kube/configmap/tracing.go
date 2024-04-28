@@ -198,9 +198,9 @@ func (t *TracingController) AddOrUpdateHigressConfig(name util.ClusterNamespaced
 		IngressLog.Errorf("data:%+v convert to tracing , error: %+v", new.Tracing, err)
 		return nil
 	}
-
+	// 检查Tracing部分数据是否有变更
 	result, _ := compareTracing(old.Tracing, new.Tracing)
-
+	// 如果有变更,DeepCopy一份Tracing数据保存到本地,同时通过eventHandler下发变更通知
 	switch result {
 	case ResultReplace:
 		if newTracing, err := deepCopyTracing(new.Tracing); err != nil {

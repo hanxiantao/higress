@@ -95,9 +95,10 @@ const (
 
 type IngressConfig struct {
 	// key: cluster id
+	// 远程Ingress控制器的映射,key为集群ID,value为common.IngressController
 	remoteIngressControllers map[string]common.IngressController
 	mutex                    sync.RWMutex
-
+	// Ingress路由和域名的缓存
 	ingressRouteCache  model.IngressRouteCollection
 	ingressDomainCache model.IngressDomainCollection
 
@@ -110,39 +111,39 @@ type IngressConfig struct {
 	serviceEntryHandlers    []model.EventHandler
 	wasmPluginHandlers      []model.EventHandler
 	watchErrorHandler       cache.WatchErrorHandler
-
+	// 缓存的EnvoyFilter配置
 	cachedEnvoyFilters []config.Config
 
 	watchedSecretSet sets.Set
-
+	// 用于协调注册表的调解器
 	RegistryReconciler *reconcile.Reconciler
-
+	// MCP桥接是否已调解的标志
 	mcpbridgeReconciled *atomic.Bool
-
+	// 管理MCP桥接相关的控制器和列表
 	mcpbridgeController mcpbridge.McpBridgeController
 
 	mcpbridgeLister netlisterv1.McpBridgeLister
-
+	// 管理WasmPlugin相关的控制器和列表
 	wasmPluginController wasmplugin.WasmPluginController
 
 	wasmPluginLister extlisterv1.WasmPluginLister
-
+	// 已注册的WasmPlugin集合,key为WasmPlugin名称
 	wasmPlugins map[string]*extensions.WasmPlugin
-
+	// 管理HTTP2RPC相关的控制器和列表
 	http2rpcController http2rpc.Http2RpcController
 
 	http2rpcLister netlisterv1.Http2RpcLister
-
+	// 已注册的HTTP2RPC集合,key为HTTP2RPC名称
 	http2rpcs map[string]*higressv1.Http2Rpc
-
+	// Configmap的管理器
 	configmapMgr *configmap.ConfigmapMgr
-
+	// 用于更新XDS
 	XDSUpdater model.XDSUpdater
 
 	annotationHandler annotations.AnnotationHandler
-
+	// 命名空间
 	namespace string
-
+	// 集群ID
 	clusterId string
 }
 
@@ -162,6 +163,7 @@ func NewIngressConfig(localKubeClient kube.Client, XDSUpdater model.XDSUpdater, 
 		wasmPlugins:              make(map[string]*extensions.WasmPlugin),
 		http2rpcs:                make(map[string]*higressv1.Http2Rpc),
 	}
+	// 对接各种注册中心
 	mcpbridgeController := mcpbridge.NewController(localKubeClient, clusterId)
 	mcpbridgeController.AddEventHandler(config.AddOrUpdateMcpBridge, config.DeleteMcpBridge)
 	config.mcpbridgeController = mcpbridgeController
@@ -176,7 +178,7 @@ func NewIngressConfig(localKubeClient kube.Client, XDSUpdater model.XDSUpdater, 
 	http2rpcController.AddEventHandler(config.AddOrUpdateHttp2Rpc, config.DeleteHttp2Rpc)
 	config.http2rpcController = http2rpcController
 	config.http2rpcLister = http2rpcController.Lister()
-
+	// 构建controller和configmapMgr
 	higressConfigController := configmap.NewController(localKubeClient, clusterId, namespace)
 	config.configmapMgr = configmap.NewConfigmapMgr(XDSUpdater, namespace, higressConfigController, higressConfigController.Lister())
 
@@ -254,6 +256,7 @@ func (m *IngressConfig) List(typ config.GroupVersionKind, namespace string) ([]c
 		defer m.mutex.RUnlock()
 		var envoyFilters []config.Config
 		// Build configmap envoy filters
+		// 调用ConfigmapMgr ConstructEnvoyFilters获取需要下发EnvoyFilter列表
 		configmapEnvoyFilters, err := m.configmapMgr.ConstructEnvoyFilters()
 		if err != nil {
 			IngressLog.Errorf("Construct configmap EnvoyFilters error %v", err)
@@ -267,6 +270,7 @@ func (m *IngressConfig) List(typ config.GroupVersionKind, namespace string) ([]c
 			IngressLog.Infof("resource type %s, configs number %d", typ, len(m.cachedEnvoyFilters))
 			return m.cachedEnvoyFilters, nil
 		}
+		// 需要下发configmap EnvoyFilter列表和m.cachedEnvoyFilters列表聚合一下下发
 		envoyFilters = append(envoyFilters, m.cachedEnvoyFilters...)
 		IngressLog.Infof("resource type %s, configs number %d", typ, len(envoyFilters))
 		return envoyFilters, nil
@@ -1445,6 +1449,7 @@ func (m *IngressConfig) Run(stop <-chan struct{}) {
 	go m.mcpbridgeController.Run(stop)
 	go m.wasmPluginController.Run(stop)
 	go m.http2rpcController.Run(stop)
+	// 启动HigressConfigController
 	go m.configmapMgr.HigressConfigController.Run(stop)
 }
 

@@ -167,6 +167,7 @@ func (c *controller) processNextWorkItem() bool {
 	return true
 }
 
+// Ingress变更事件处理
 func (c *controller) onEvent(namespacedName types.NamespacedName) error {
 	event := model.EventUpdate
 	ing, err := c.ingressLister.Ingresses(namespacedName.Namespace).Get(namespacedName.Name)
@@ -201,7 +202,8 @@ func (c *controller) onEvent(namespacedName types.NamespacedName) error {
 			return nil
 		}
 	}
-
+	// 对应的handler是由pkg/bootstrap/server.go initRegistryEventHandlers中注册的
+	// handler的处理逻辑:调用xdsServer.ConfigUpdate()触发xds全量更新
 	drmetadata := config.Meta{
 		Name:             ing.Name + "-" + "destinationrule",
 		Namespace:        ing.Namespace,
@@ -357,7 +359,6 @@ func (c *controller) ConvertGateway(convertOptions *common.ConvertOptions, wrapp
 		common.IncrementInvalidIngress(c.options.ClusterId, common.EmptyRule)
 		return fmt.Errorf("invalid ingress rule %s:%s in cluster %s, either `defaultBackend` or `rules` must be specified", cfg.Namespace, cfg.Name, c.options.ClusterId)
 	}
-
 
 	for _, rule := range ingressV1.Rules {
 		// Need create builder for every rule.

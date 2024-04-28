@@ -61,7 +61,7 @@ type ConfigmapMgr struct {
 }
 
 func NewConfigmapMgr(XDSUpdater model.XDSUpdater, namespace string, higressConfigController HigressConfigController, higressConfigLister listersv1.ConfigMapNamespaceLister) *ConfigmapMgr {
-
+	// 构建ConfigmapMgr
 	configmapMgr := &ConfigmapMgr{
 		XDSUpdater:              XDSUpdater,
 		Namespace:               namespace,
@@ -69,16 +69,20 @@ func NewConfigmapMgr(XDSUpdater model.XDSUpdater, namespace string, higressConfi
 		HigressConfigLister:     higressConfigLister,
 		higressConfig:           atomic.Value{},
 	}
+	// 设置HigressConfigController configmap新增或者更新回调函数configmapMgr.AddOrUpdateHigressConfig
 	configmapMgr.HigressConfigController.AddEventHandler(configmapMgr.AddOrUpdateHigressConfig)
+	// 设置HigressConfig结构体默认值
 	configmapMgr.SetHigressConfig(NewDefaultHigressConfig())
-
+	// 初始化TracingController
 	tracingController := NewTracingController(namespace)
+	// 把tracingController添加到configmapMgr itemControllers里
 	configmapMgr.AddItemControllers(tracingController)
 
 	gzipController := NewGzipController(namespace)
 	configmapMgr.AddItemControllers(gzipController)
 
 	globalOptionController := NewGlobalOptionController(namespace)
+	// 初始化itemEventHandler,同时遍历itemControllers,设置itemEventHandler
 	configmapMgr.AddItemControllers(globalOptionController)
 
 	configmapMgr.initEventHandlers()
@@ -105,11 +109,13 @@ func (c *ConfigmapMgr) AddItemControllers(controllers ...ItemController) {
 }
 
 func (c *ConfigmapMgr) AddOrUpdateHigressConfig(name util.ClusterNamespacedName) {
+	// 只监听higress-system命名空间下name为higress-config Configmap的变化
 	if name.Namespace != c.Namespace || name.Name != HigressConfigMapName {
 		return
 	}
 
 	IngressLog.Infof("configmapMgr AddOrUpdateHigressConfig")
+	// 获取higress-config内容
 	higressConfigmap, err := c.HigressConfigLister.Get(HigressConfigMapName)
 	if err != nil {
 		IngressLog.Errorf("higress-config configmap is not found, namespace:%s, name:%s",
@@ -120,20 +126,20 @@ func (c *ConfigmapMgr) AddOrUpdateHigressConfig(name util.ClusterNamespacedName)
 	if _, ok := higressConfigmap.Data[HigressConfigMapKey]; !ok {
 		return
 	}
-
+	// 通过yaml.Unmarshal转成HigressConfig
 	newHigressConfig := NewDefaultHigressConfig()
 	if err = yaml.Unmarshal([]byte(higressConfigmap.Data[HigressConfigMapKey]), newHigressConfig); err != nil {
 		IngressLog.Errorf("data:%s,  convert to higress config error, error: %+v", higressConfigmap.Data[HigressConfigMapKey], err)
 		return
 	}
-
+	// 遍历ItemControllers,校验配置是否合法
 	for _, itemController := range c.ItemControllers {
 		if itemErr := itemController.ValidHigressConfig(newHigressConfig); itemErr != nil {
 			IngressLog.Errorf("configmap %s controller valid higress config error, error: %+v", itemController.GetName(), itemErr)
 			return
 		}
 	}
-
+	// 和上次比对这次数据是否有变更
 	oldHigressConfig := c.GetHigressConfig()
 	IngressLog.Infof("configmapMgr oldHigressConfig: %s", GetHigressConfigString(oldHigressConfig))
 	IngressLog.Infof("configmapMgr newHigressConfig: %s", GetHigressConfigString(newHigressConfig))
@@ -147,7 +153,7 @@ func (c *ConfigmapMgr) AddOrUpdateHigressConfig(name util.ClusterNamespacedName)
 	if result == ResultDelete {
 		newHigressConfig = NewDefaultHigressConfig()
 	}
-
+	// 如果数据有变更,就遍历ItemControllers通知每个itemController数据有变更,同时保存这次变更到本地
 	if result == ResultReplace || result == ResultDelete {
 		// Pass AddOrUpdateHigressConfig to itemControllers
 		for _, itemController := range c.ItemControllers {
@@ -156,6 +162,7 @@ func (c *ConfigmapMgr) AddOrUpdateHigressConfig(name util.ClusterNamespacedName)
 				IngressLog.Errorf("configmap %s controller AddOrUpdateHigressConfig error, error: %+v", itemController.GetName(), itemErr)
 			}
 		}
+		// 保存这次变更
 		c.SetHigressConfig(newHigressConfig)
 		IngressLog.Infof("configmapMgr higress config AddOrUpdate success, reuslt is %d", result)
 		// Call updateConfig

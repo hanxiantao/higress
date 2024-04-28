@@ -122,17 +122,27 @@ type ServerInterface interface {
 }
 
 type Server struct {
+	// Server参数配置
 	*ServerArgs
-	environment      *model.Environment
-	kubeClient       higresskube.Client
+	// Pilot环境配置
+	environment *model.Environment
+	// 与Kubernetes集成的客户端
+	kubeClient higresskube.Client
+	// 配置存储控制器
 	configController model.ConfigStoreCache
-	configStores     []model.ConfigStoreCache
-	httpServer       *http.Server
-	httpMux          *http.ServeMux
-	grpcServer       *grpc.Server
-	xdsServer        *xds.DiscoveryServer
-	server           server.Instance
-	readinessProbes  map[string]readinessProbe
+	// 多个配置存储的缓存
+	configStores []model.ConfigStoreCache
+	// HTTP请求处理器
+	httpServer *http.Server
+	httpMux    *http.ServeMux
+	// grpc服务
+	grpcServer *grpc.Server
+	// xds服务
+	xdsServer *xds.DiscoveryServer
+	// Pilot Server实例配置
+	server server.Instance
+	// server内部服务记录表,记录服务是否准备好
+	readinessProbes map[string]readinessProbe
 }
 
 var (
@@ -141,17 +151,19 @@ var (
 )
 
 func NewServer(args *ServerArgs) (*Server, error) {
+	// 初始化Pilot的环境API model.Environment
 	e := &model.Environment{
 		PushContext:  model.NewPushContext(),
 		DomainSuffix: constants.DefaultKubernetesDomain,
 		MCPMode:      true,
 	}
 	e.SetLedger(buildLedger(args.RegistryOptions))
-
+	// 为model.Environment设置服务发现的接口ServiceDiscovery,用于列举服务和实例
 	ac := aggregate.NewController(aggregate.Options{
 		MeshHolder: e,
 	})
 	e.ServiceDiscovery = ac
+	// 初始化Server实例
 	s := &Server{
 		ServerArgs:      args,
 		httpMux:         http.NewServeMux(),
@@ -161,6 +173,7 @@ func NewServer(args *ServerArgs) (*Server, error) {
 	}
 	s.environment.Watcher = mesh.NewFixedWatcher(&v1alpha1.MeshConfig{})
 	s.environment.Init()
+	// 创建初始启动函数列表
 	initFuncList := []func() error{
 		s.initKubeClient,
 		s.initXdsServer,
@@ -175,7 +188,7 @@ func NewServer(args *ServerArgs) (*Server, error) {
 			return nil, err
 		}
 	}
-
+	// 向Pilot Server注册kubeClient启动函数
 	s.server.RunComponent(func(stop <-chan struct{}) error {
 		s.kubeClient.RunAndWait(stop)
 		return nil
@@ -228,8 +241,9 @@ func (s *Server) initConfigController() error {
 	if options.ClusterId == "Kubernetes" {
 		options.ClusterId = ""
 	}
-
+	// 创建IngressTranslation对象,该对象用于处理Ingress的翻译和配置
 	ingressConfig := translation.NewIngressTranslation(s.kubeClient, s.xdsServer, ns, options.ClusterId)
+	// 向ingressConfig中添加本地集群的配置,并获取对应的Ingress控制器和Kingress控制器
 	ingressController, kingressController := ingressConfig.AddLocalCluster(options)
 
 	s.configStores = append(s.configStores, ingressConfig)
@@ -242,6 +256,7 @@ func (s *Server) initConfigController() error {
 	s.configController = aggregateConfigController
 
 	// Create the config store.
+	// 设置Pilot环境配置的IstioConfigStore
 	s.environment.IstioConfigStore = model.MakeIstioStore(s.configController)
 
 	s.environment.IngressStore = ingressConfig
@@ -258,14 +273,17 @@ func (s *Server) initConfigController() error {
 }
 
 func (s *Server) Start(stop <-chan struct{}) error {
+	// 遍历Pilot Server的components,执行chan管道里的函数
 	if err := s.server.Start(stop); err != nil {
 		return err
 	}
+	// 等待缓存同步完成
 	if !s.waitForCacheSync(stop) {
 		return fmt.Errorf("failed to sync cache")
 	}
 	// Inform Discovery Server so that it can start accepting connections.
 	s.xdsServer.CachesSynced()
+	// 启动grpc服务
 	grpcListener, err := net.Listen("tcp", s.GrpcAddress)
 	if err != nil {
 		return err
@@ -276,6 +294,7 @@ func (s *Server) Start(stop <-chan struct{}) error {
 			log.Errorf("error serving GRPC server: %v", err)
 		}
 	}()
+	// 启动http服务
 	httpListener, err := net.Listen("tcp", s.HttpAddress)
 	if err != nil {
 		return err
@@ -338,6 +357,7 @@ func (s *Server) initXdsServer() error {
 	s.xdsServer.ProxyNeedsPush = func(proxy *model.Proxy, req *model.PushRequest) bool {
 		return true
 	}
+	// 向Pilot Server注册xdsServer启动函数
 	s.server.RunComponent(func(stop <-chan struct{}) error {
 		log.Infof("Starting ADS server")
 		s.xdsServer.Start(stop)

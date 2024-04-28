@@ -151,6 +151,7 @@ func (m *IngressTranslation) Get(typ config.GroupVersionKind, name, namespace st
 	return nil
 }
 
+// List 实现了ConfigStore的List方法,推送xds时(PushContext的InitContext方法执行时)每个资源会调用该方法获取资源的全量数据
 func (m *IngressTranslation) List(typ config.GroupVersionKind, namespace string) ([]config.Config, error) {
 	if typ != gvk.Gateway &&
 		typ != gvk.VirtualService &&
