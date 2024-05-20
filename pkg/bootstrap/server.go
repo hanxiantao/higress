@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/alibaba/higress/pkg/cert"
 	"github.com/alibaba/higress/pkg/ingress/kube/common"
 	"github.com/alibaba/higress/pkg/ingress/mcp"
 	"github.com/alibaba/higress/pkg/ingress/translation"
@@ -112,6 +113,9 @@ type ServerArgs struct {
 	GatewaySelectorValue string
 	GatewayHttpPort      uint32
 	GatewayHttpsPort     uint32
+	EnableAutomaticHttps bool
+	AutomaticHttpsEmail  string
+	CertHttpAddress      string
 }
 
 type readinessProbe func() (bool, error)
@@ -131,18 +135,19 @@ type Server struct {
 	// 配置存储控制器
 	configController model.ConfigStoreCache
 	// 多个配置存储的缓存
-	configStores []model.ConfigStoreCache
+	configStores     []model.ConfigStoreCache
 	// HTTP请求处理器
-	httpServer *http.Server
-	httpMux    *http.ServeMux
+	httpServer       *http.Server
+	httpMux          *http.ServeMux
 	// grpc服务
-	grpcServer *grpc.Server
+	grpcServer       *grpc.Server
 	// xds服务
-	xdsServer *xds.DiscoveryServer
+	xdsServer        *xds.DiscoveryServer
 	// Pilot Server实例配置
-	server server.Instance
+	server           server.Instance
 	// server内部服务记录表,记录服务是否准备好
-	readinessProbes map[string]readinessProbe
+	readinessProbes  map[string]readinessProbe
+	certServer       *cert.Server
 }
 
 var (
@@ -181,6 +186,7 @@ func NewServer(args *ServerArgs) (*Server, error) {
 		s.initConfigController,
 		s.initRegistryEventHandlers,
 		s.initAuthenticators,
+		s.initAutomaticHttps,
 	}
 
 	for _, f := range initFuncList {
@@ -306,6 +312,15 @@ func (s *Server) Start(stop <-chan struct{}) error {
 		}
 	}()
 
+	if s.EnableAutomaticHttps {
+		go func() {
+			log.Infof("starting Automatic Cert HTTP service at %s", s.CertHttpAddress)
+			if err := s.certServer.Run(stop); err != nil {
+				log.Errorf("error serving Automatic Cert HTTP server: %v", err)
+			}
+		}()
+	}
+
 	s.waitForShutDown(stop)
 	return nil
 }
@@ -388,6 +403,26 @@ func (s *Server) initAuthenticators() error {
 		s.xdsServer.Authenticators = authenticators
 	}
 	return nil
+}
+
+func (s *Server) initAutomaticHttps() error {
+	certOption := &cert.Option{
+		Namespace:     PodNamespace,
+		ServerAddress: s.CertHttpAddress,
+		Email:         s.AutomaticHttpsEmail,
+	}
+	certServer, err := cert.NewServer(s.kubeClient.Kube(), certOption)
+	if err != nil {
+		return err
+	}
+	s.certServer = certServer
+	log.Infof("init cert default config")
+	s.certServer.InitDefaultConfig()
+	if !s.EnableAutomaticHttps {
+		log.Info("automatic https is disabled")
+		return nil
+	}
+	return s.certServer.InitServer()
 }
 
 func (s *Server) initKubeClient() error {

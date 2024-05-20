@@ -1,5 +1,6 @@
 revision: ""
 global:
+  liteMetrics: false
   xdsMaxRecvMsgSize: "104857600"
   defaultUpstreamConcurrencyThreshold: 10000
   enableSRDS: true
@@ -337,6 +338,20 @@ global:
   # Use the Mesh Control Protocol (MCP) for configuring Istiod. Requires an MCP source.
   useMCP: false
 
+  # Observability (o11y) configurations
+  o11y:
+    enabled: false
+    promtail:
+      image:
+        repository: grafana/promtail
+        tag: 2.9.4
+      port: 3101
+      resources:
+        limits:
+          cpu: 500m
+          memory: 2Gi
+      securityContext: {}
+
   # The name of the CA for workload certificates.
   # For example, when caName=GkeWorkloadCertificate, GKE workload certificates
   # will be used as the certificates for workloads.
@@ -530,6 +545,12 @@ controller:
       "targetPort": 8888,
     },
     {
+      "name": "http-solver",
+      "protocol": "TCP",
+      "port": 8889,
+      "targetPort": 8889,
+    },
+    {
       "name": "grpc",
       "protocol": "TCP",
       "port": 15051,
@@ -567,6 +588,9 @@ controller:
     minReplicas: 1
     maxReplicas: 5
     targetCPUUtilizationPercentage: 80
+  automaticHttps:
+    enabled: false
+    email: ""
   
 ## Discovery Settings
 pilot:
