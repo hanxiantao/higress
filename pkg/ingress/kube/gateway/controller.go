@@ -17,6 +17,7 @@ package gateway
 import (
 	"sync/atomic"
 
+	higresscollections "github.com/alibaba/higress/pkg/ingress/kube/gateway/istio/schema/collections"
 	"istio.io/istio/pilot/pkg/config/kube/crdclient"
 	"istio.io/istio/pilot/pkg/credentials"
 	kubecredentials "istio.io/istio/pilot/pkg/credentials/kube"
@@ -26,7 +27,6 @@ import (
 	"istio.io/istio/pkg/config"
 	"istio.io/istio/pkg/config/constants"
 	"istio.io/istio/pkg/config/schema/collection"
-	"istio.io/istio/pkg/config/schema/collections"
 	"istio.io/istio/pkg/config/schema/gvk"
 	"istio.io/istio/pkg/config/schema/resource"
 	"istio.io/istio/pkg/kube"
@@ -62,8 +62,8 @@ func NewController(client kube.Client, options common.Options) common.GatewayCon
 		Identifier:   "gateway-controller",
 	}
 	schemasBuilder := collection.NewSchemasBuilder()
-	collections.PilotGatewayAPI().ForEach(func(schema resource.Schema) bool {
-		if schema.Group() == collections.GatewayClass.Group() {
+	higresscollections.PilotGatewayAPI().ForEach(func(schema resource.Schema) bool {
+		if schema.Group() == higresscollections.GatewayClass.Group() {
 			schemasBuilder.MustAdd(schema)
 		}
 		return false
