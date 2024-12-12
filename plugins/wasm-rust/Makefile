@@ -1,6 +1,6 @@
-PLUGIN_NAME ?= say-hello
-BUILDER_REGISTRY ?= higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/
-REGISTRY ?= higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/
+PLUGIN_NAME ?= proxy-cache
+BUILDER_REGISTRY ?= registry.cn-hangzhou.aliyuncs.com/wasm-plugin/
+REGISTRY ?= registry.cn-hangzhou.aliyuncs.com/wasm-plugin/
 RUST_VERSION ?= 1.82
 ORAS_VERSION ?= 1.0.0
 HIGRESS_VERSION ?= 1.0.0-rc
