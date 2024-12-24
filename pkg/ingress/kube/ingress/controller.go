@@ -422,6 +422,26 @@ func (c *controller) ConvertGateway(convertOptions *common.ConvertOptions, wrapp
 			}
 		}
 
+		// If ssl passthrough, append https server.
+		if wrapper.IsSslPassthrough() {
+			// Append https server
+			wrapperGateway.Gateway.Servers = append(wrapperGateway.Gateway.Servers, &networking.Server{
+				Port: &networking.Port{
+					Number:   443,
+					Protocol: string(protocol.HTTPS),
+					Name:     common.CreateConvertedName("https-443-ingress", c.options.ClusterId.String()),
+				},
+				Hosts: []string{rule.Host},
+				Tls: &networking.ServerTLSSettings{
+					Mode: networking.ServerTLSSettings_PASSTHROUGH,
+				},
+			})
+			domainBuilder.Protocol = common.HTTPS
+			// Update domain builder
+			convertOptions.IngressDomainCache.Valid[rule.Host] = domainBuilder
+			continue
+		}
+
 		// There are no tls settings, so just skip.
 		if len(ingressV1Beta.TLS) == 0 {
 			continue
@@ -461,13 +481,13 @@ func (c *controller) ConvertGateway(convertOptions *common.ConvertOptions, wrapp
 				}
 			}
 		}
+
 		if secretName == "" {
 			// There no matching secret, so just skip.
 			continue
 		}
 
 		domainBuilder.Protocol = common.HTTPS
-
 		domainBuilder.SecretName = path.Join(c.options.ClusterId.String(), cfg.Namespace, secretName)
 
 		// There is a matching secret and the gateway has already a tls secret.

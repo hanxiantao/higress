@@ -112,6 +112,9 @@ func (d downstreamTLS) ApplyGateway(gateway *networking.Gateway, config *Ingress
 }
 
 func needDownstreamTLS(annotations Annotations) bool {
+	if annotations[SslPassthroughAnnotations] == "true" {
+		return false
+	}
 	return annotations.HasASAP(sslCipher) ||
 		annotations.HasASAP(authTLSSecret)
 }

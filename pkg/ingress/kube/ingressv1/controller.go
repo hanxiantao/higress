@@ -337,6 +337,13 @@ func extractTLSSecretName(host string, tls []ingress.IngressTLS) string {
 }
 
 func (c *controller) ConvertGateway(convertOptions *common.ConvertOptions, wrapper *common.WrapperConfig, httpsCredentialConfig *cert.Config) error {
+	if convertOptions == nil {
+		return fmt.Errorf("convertOptions is nil")
+	}
+	if wrapper == nil {
+		return fmt.Errorf("wrapperConfig is nil")
+	}
+
 	// Ignore canary config.
 	if wrapper.AnnotationsConfig.IsCanary() {
 		return nil
@@ -394,6 +401,26 @@ func (c *controller) ConvertGateway(convertOptions *common.ConvertOptions, wrapp
 			if wrapperGateway.WrapperConfig.AnnotationsConfig.DownstreamTLS == nil {
 				wrapperGateway.WrapperConfig.AnnotationsConfig.DownstreamTLS = wrapper.AnnotationsConfig.DownstreamTLS
 			}
+		}
+
+		// If ssl passthrough, append https server.
+		if wrapper.IsSslPassthrough() {
+			// Append https server
+			wrapperGateway.Gateway.Servers = append(wrapperGateway.Gateway.Servers, &networking.Server{
+				Port: &networking.Port{
+					Number:   c.options.GatewayHttpsPort,
+					Protocol: string(protocol.HTTPS),
+					Name:     common.CreateConvertedName("https-"+strconv.FormatUint(uint64(c.options.GatewayHttpsPort), 10)+"-ingress", string(c.options.ClusterId)),
+				},
+				Hosts: []string{rule.Host},
+				Tls: &networking.ServerTLSSettings{
+					Mode: networking.ServerTLSSettings_PASSTHROUGH,
+				},
+			})
+			domainBuilder.Protocol = common.HTTPS
+			// Update domain builder
+			convertOptions.IngressDomainCache.Valid[rule.Host] = domainBuilder
+			continue
 		}
 
 		// There are no tls settings, so just skip.
@@ -457,7 +484,7 @@ func (c *controller) ConvertGateway(convertOptions *common.ConvertOptions, wrapp
 		// Append https server
 		wrapperGateway.Gateway.Servers = append(wrapperGateway.Gateway.Servers, &networking.Server{
 			Port: &networking.Port{
-				Number:   uint32(c.options.GatewayHttpsPort),
+				Number:   c.options.GatewayHttpsPort,
 				Protocol: string(protocol.HTTPS),
 				Name:     common.CreateConvertedName("https-"+strconv.FormatUint(uint64(c.options.GatewayHttpsPort), 10)+"-ingress", string(c.options.ClusterId)),
 			},

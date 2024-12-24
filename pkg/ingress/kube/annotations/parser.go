@@ -26,6 +26,9 @@ const (
 
 	// HigressAnnotationsPrefix defines the common prefix used in the higress ingress controller
 	HigressAnnotationsPrefix = "higress.io"
+
+	// SslPassthroughAnnotations defines the annotation key used to enable ssl passthrough
+	SslPassthroughAnnotations = DefaultAnnotationsPrefix + "/ssl-passthrough"
 )
 
 var (

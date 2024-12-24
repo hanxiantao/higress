@@ -75,6 +75,13 @@ func (w *WrapperGateway) IsHTTPS() bool {
 	return false
 }
 
+func (config *WrapperConfig) IsSslPassthrough() bool {
+	if config == nil || config.Config == nil || config.Config.Annotations == nil {
+		return false
+	}
+	return config.Config.Annotations[annotations.SslPassthroughAnnotations] == "true"
+}
+
 type WrapperHTTPRoute struct {
 	HTTPRoute        *networking.HTTPRoute
 	WrapperConfig    *WrapperConfig
