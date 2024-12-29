@@ -80,6 +80,8 @@ type Ingress struct {
 	HeaderControl *HeaderControlConfig
 
 	Http2Rpc *Http2RpcConfig
+
+	SslPassthroughConfig *SslPassthroughConfig
 }
 
 func (i *Ingress) NeedRegexMatch(path string) bool {
@@ -169,12 +171,15 @@ func NewAnnotationHandlerManager() AnnotationHandler {
 			match{},
 			headerControl{},
 			http2rpc{},
+			sslPassthrough{},
 		},
 		gatewayHandlers: []GatewayHandler{
 			downstreamTLS{},
+			sslPassthrough{},
 		},
 		virtualServiceHandlers: []VirtualServiceHandler{
 			ipAccessControl{},
+			sslPassthrough{},
 		},
 		routeHandlers: []RouteHandler{
 			cors{},
