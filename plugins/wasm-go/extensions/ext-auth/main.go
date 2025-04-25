@@ -27,12 +27,14 @@ import (
 	"github.com/higress-group/proxy-wasm-go-sdk/proxywasm/types"
 )
 
-func main() {
+func main() {}
+
+func init() {
 	wrapper.SetCtx(
 		"ext-auth",
-		wrapper.ParseConfigBy(config.ParseConfig),
-		wrapper.ProcessRequestHeadersBy(onHttpRequestHeaders),
-		wrapper.ProcessRequestBodyBy(onHttpRequestBody),
+		wrapper.ParseConfig(config.ParseConfig),
+		wrapper.ProcessRequestHeaders(onHttpRequestHeaders),
+		wrapper.ProcessRequestBody(onHttpRequestBody),
 	)
 }
 
@@ -51,7 +53,7 @@ const (
 	HeaderXForwardedHost   = "x-forwarded-host"
 )
 
-func onHttpRequestHeaders(ctx wrapper.HttpContext, config config.ExtAuthConfig, log log.Log) types.Action {
+func onHttpRequestHeaders(ctx wrapper.HttpContext, config config.ExtAuthConfig) types.Action {
 	// If the request's domain and path match the MatchRules, skip authentication
 	if config.MatchRules.IsAllowedByMode(ctx.Host(), ctx.Method(), wrapper.GetRequestPathWithoutQuery()) {
 		ctx.DontReadRequestBody()
@@ -71,17 +73,17 @@ func onHttpRequestHeaders(ctx wrapper.HttpContext, config config.ExtAuthConfig, 
 	}
 
 	ctx.DontReadRequestBody()
-	return checkExtAuth(ctx, config, nil, log, types.HeaderStopAllIterationAndWatermark)
+	return checkExtAuth(ctx, config, nil, types.HeaderStopAllIterationAndWatermark)
 }
 
-func onHttpRequestBody(ctx wrapper.HttpContext, config config.ExtAuthConfig, body []byte, log log.Log) types.Action {
+func onHttpRequestBody(ctx wrapper.HttpContext, config config.ExtAuthConfig, body []byte) types.Action {
 	if config.HttpService.AuthorizationRequest.WithRequestBody {
-		return checkExtAuth(ctx, config, body, log, types.DataStopIterationAndBuffer)
+		return checkExtAuth(ctx, config, body, types.DataStopIterationAndBuffer)
 	}
 	return types.ActionContinue
 }
 
-func checkExtAuth(ctx wrapper.HttpContext, cfg config.ExtAuthConfig, body []byte, log log.Log, pauseAction types.Action) types.Action {
+func checkExtAuth(ctx wrapper.HttpContext, cfg config.ExtAuthConfig, body []byte, pauseAction types.Action) types.Action {
 	httpServiceConfig := cfg.HttpService
 
 	extAuthReqHeaders := buildExtAuthRequestHeaders(ctx, cfg)

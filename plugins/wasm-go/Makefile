@@ -1,12 +1,9 @@
 PLUGIN_NAME ?= hello-world
 BUILDER_REGISTRY ?= higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/
 REGISTRY ?= higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/
-GO_VERSION ?= 1.20.14
-TINYGO_VERSION ?= 0.29.0
+GO_VERSION ?= 1.24.1
 ORAS_VERSION ?= 1.0.0
-HIGRESS_VERSION ?= 1.0.0-rc
-USE_HIGRESS_TINYGO ?= false
-BUILDER ?= ${BUILDER_REGISTRY}wasm-go-builder:go${GO_VERSION}-tinygo${TINYGO_VERSION}-oras${ORAS_VERSION}
+BUILDER ?= ${BUILDER_REGISTRY}wasm-go-builder:go${GO_VERSION}-oras${ORAS_VERSION}
 BUILD_TIME := $(shell date "+%Y%m%d-%H%M%S")
 COMMIT_ID := $(shell git rev-parse --short HEAD 2>/dev/null)
 IMAGE_TAG = $(if $(strip $(PLUGIN_VERSION)),${PLUGIN_VERSION},${BUILD_TIME}-${COMMIT_ID})
@@ -43,7 +40,7 @@ build-push: build-image
 # To build a wasm-go-builder image.
 # e.g.
 #   REGISTRY=<your_docker_registry> make builder
-# If you want to use Go/TinyGo/Oras with another version, please modify GO_VERSION/TINYGO_VERSION/ORAS_VERSION.
+# If you want to use Go/Oras with another version, please modify GO_VERSION/ORAS_VERSION.
 # After your wasm-go-builder image is built, you can use it to build plugin image.
 # e.g.
 #   PLUGIN_NAME=request-block BUILDER=<your-wasm-go-builder> make
@@ -52,10 +49,7 @@ builder:
 			--platform linux/amd64,linux/arm64 \
 			--build-arg BASE_IMAGE=docker.io/ubuntu \
 			--build-arg GO_VERSION=$(GO_VERSION) \
-			--build-arg TINYGO_VERSION=$(TINYGO_VERSION) \
 			--build-arg ORAS_VERSION=$(ORAS_VERSION) \
-			--build-arg HIGRESS_VERSION=$(HIGRESS_VERSION) \
-			--build-arg USE_HIGRESS_TINYGO=$(USE_HIGRESS_TINYGO) \
 			-f DockerfileBuilder \
 			-t ${BUILDER} \
 			--push \
@@ -64,9 +58,12 @@ builder:
 	@echo "image: ${BUILDER}"
 
 local-build:
-	tinygo build -scheduler=none -target=wasi -gc=custom -tags='custommalloc nottinygc_finalizer' \
-		-o extensions/${PLUGIN_NAME}/main.wasm \
-		extensions/${PLUGIN_NAME}/main.go
+	cd extensions/${PLUGIN_NAME} && \
+	export GOOS=wasip1; \
+	export GOARCH=wasm; \
+	go build -buildmode=c-shared \
+		$(if $(strip $(EXTRA_TAGS)), -tags="$(EXTRA_TAGS)") \
+		-o main.wasm
 	@echo ""
 	@echo "wasm: extensions/${PLUGIN_NAME}/main.wasm"
 

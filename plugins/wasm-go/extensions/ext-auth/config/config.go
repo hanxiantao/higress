@@ -58,12 +58,12 @@ type AuthorizationResponse struct {
 	AllowedClientHeaders   expr.Matcher
 }
 
-func ParseConfig(json gjson.Result, config *ExtAuthConfig, log log.Log) error {
+func ParseConfig(json gjson.Result, config *ExtAuthConfig) error {
 	httpServiceConfig := json.Get("http_service")
 	if !httpServiceConfig.Exists() {
 		return errors.New("missing http_service in config")
 	}
-	if err := parseHttpServiceConfig(httpServiceConfig, config, log); err != nil {
+	if err := parseHttpServiceConfig(httpServiceConfig, config); err != nil {
 		return err
 	}
 
@@ -90,10 +90,10 @@ func ParseConfig(json gjson.Result, config *ExtAuthConfig, log log.Log) error {
 	return nil
 }
 
-func parseHttpServiceConfig(json gjson.Result, config *ExtAuthConfig, log log.Log) error {
+func parseHttpServiceConfig(json gjson.Result, config *ExtAuthConfig) error {
 	var httpService HttpService
 
-	if err := parseEndpointConfig(json, &httpService, log); err != nil {
+	if err := parseEndpointConfig(json, &httpService); err != nil {
 		return err
 	}
 
@@ -116,7 +116,7 @@ func parseHttpServiceConfig(json gjson.Result, config *ExtAuthConfig, log log.Lo
 	return nil
 }
 
-func parseEndpointConfig(json gjson.Result, httpService *HttpService, log log.Log) error {
+func parseEndpointConfig(json gjson.Result, httpService *HttpService) error {
 	endpointMode := json.Get("endpoint_mode").String()
 	if endpointMode == "" {
 		endpointMode = EndpointModeEnvoy

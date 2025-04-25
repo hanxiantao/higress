@@ -1,4 +1,4 @@
-ARG BUILDER=higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/wasm-go-builder:go1.20.14-tinygo0.29.0-oras1.0.0
+ARG BUILDER=higress-registry.cn-hangzhou.cr.aliyuncs.com/plugins/wasm-go-builder:go1.24.1-oras1.0.0
 FROM $BUILDER as builder
 
 
@@ -17,7 +17,12 @@ COPY . .
 WORKDIR /workspace/extensions/$PLUGIN_NAME
 
 RUN go mod tidy
-RUN tinygo build -o /main.wasm -scheduler=none -gc=custom -tags="custommalloc nottinygc_finalizer $EXTRA_TAGS" -target=wasi ./
+RUN go mod tidy
+RUN export GOOS=wasip1; \
+    export GOARCH=wasm; \
+    go build -buildmode=c-shared \
+        $(if [ -n "${EXTRA_TAGS}" ]; then echo "-tags=\"${EXTRA_TAGS}\""; fi) \
+        -o /main.wasm
 
 FROM scratch as output
 
