@@ -29,19 +29,19 @@ use std::rc::Rc;
 
 proxy_wasm::main! {{
     proxy_wasm::set_log_level(LogLevel::Trace);
-    proxy_wasm::set_root_context(|_|Box::new(RquestBlockRoot::new()));
+    proxy_wasm::set_root_context(|_|Box::new(RequestBlockRoot::new()));
 }}
 
 const PLUGIN_NAME: &str = "request-block";
 
-struct RquestBlockRoot {
+struct RequestBlockRoot {
     log: Log,
-    rule_matcher: SharedRuleMatcher<RquestBlockConfig>,
+    rule_matcher: SharedRuleMatcher<RequestBlockConfig>,
 }
 
-struct RquestBlock {
+struct RequestBlock {
     log: Log,
-    config: Option<Rc<RquestBlockConfig>>,
+    config: Option<Rc<RequestBlockConfig>>,
     cache_request: bool,
 }
 
@@ -78,7 +78,7 @@ fn case_sensitive_default() -> bool {
 }
 #[derive(Default, Debug, Deserialize, Clone)]
 #[serde(default)]
-pub struct RquestBlockConfig {
+pub struct RequestBlockConfig {
     #[serde(default = "blocked_code_default")]
     blocked_code: u32,
     blocked_message: String,
@@ -92,18 +92,18 @@ pub struct RquestBlockConfig {
     block_regexp_urls: Vec<Regex>,
 }
 
-impl RquestBlockRoot {
+impl RequestBlockRoot {
     fn new() -> Self {
-        RquestBlockRoot {
+        RequestBlockRoot {
             log: Log::new(PLUGIN_NAME.to_string()),
             rule_matcher: Rc::new(RefCell::new(RuleMatcher::default())),
         }
     }
 }
 
-impl Context for RquestBlockRoot {}
+impl Context for RequestBlockRoot {}
 
-impl RootContext for RquestBlockRoot {
+impl RootContext for RequestBlockRoot {
     fn on_configure(&mut self, plugin_configuration_size: usize) -> bool {
         let ret = on_configure(
             self,
@@ -121,16 +121,16 @@ impl RootContext for RquestBlockRoot {
     }
 }
 
-impl RootContextWrapper<RquestBlockConfig> for RquestBlockRoot {
-    fn rule_matcher(&self) -> &SharedRuleMatcher<RquestBlockConfig> {
+impl RootContextWrapper<RequestBlockConfig> for RequestBlockRoot {
+    fn rule_matcher(&self) -> &SharedRuleMatcher<RequestBlockConfig> {
         &self.rule_matcher
     }
 
     fn create_http_context_wrapper(
         &self,
         _context_id: u32,
-    ) -> Option<Box<dyn HttpContextWrapper<RquestBlockConfig>>> {
-        Some(Box::new(RquestBlock {
+    ) -> Option<Box<dyn HttpContextWrapper<RequestBlockConfig>>> {
+        Some(Box::new(RequestBlock {
             cache_request: false,
             config: None,
             log: Log::new(PLUGIN_NAME.to_string()),
@@ -138,10 +138,10 @@ impl RootContextWrapper<RquestBlockConfig> for RquestBlockRoot {
     }
 }
 
-impl Context for RquestBlock {}
-impl HttpContext for RquestBlock {}
-impl HttpContextWrapper<RquestBlockConfig> for RquestBlock {
-    fn on_config(&mut self, config: Rc<RquestBlockConfig>) {
+impl Context for RequestBlock {}
+impl HttpContext for RequestBlock {}
+impl HttpContextWrapper<RequestBlockConfig> for RequestBlock {
+    fn on_config(&mut self, config: Rc<RequestBlockConfig>) {
         self.cache_request = !config.block_bodies.is_empty();
         self.config = Some(config.clone());
     }
